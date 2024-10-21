@@ -1,0 +1,89 @@
+import struct
+
+# Class to store RGB values for each pixel
+class Pixel:
+    def __init__(self, r, g, b):
+        self.r = r
+        self.g = g
+        self.b = b
+
+# Function to read BMP image file
+def read_image(filename):
+    with open(filename, 'rb') as f:
+        header = f.read(54)
+
+        # Extract width and height from the header
+        width = struct.unpack('i', header[18:22])[0]
+        height = struct.unpack('i', header[22:26])[0]
+
+        # Calculate padding (BMP rows must be a multiple of 4 bytes)
+        padding = (width * 3) % 4
+
+        # Allocate memory for image pixels
+        pixels = []
+
+        # Read pixel data (consider padding)
+        for i in range(height):
+            row = []
+            for j in range(width):
+                b, g, r = struct.unpack('BBB', f.read(3))
+                row.append(Pixel(r, g, b))
+            pixels.extend(row)
+            f.read(padding)  # Skip padding bytes
+
+    return pixels, width, height, padding
+
+# Function to write BMP image file
+def write_image(filename, pixels, width, height, padding):
+    with open(filename, 'wb') as f:
+        # Create BMP file header
+        header = bytearray(54)
+        header[0:2] = b'BM'
+        struct.pack_into('i', header, 18, width)
+        struct.pack_into('i', header, 22, height)
+        header[26:28] = (1).to_bytes(2, 'little')
+        header[28:30] = (24).to_bytes(2, 'little')
+
+        f.write(header)
+
+        # Write pixel data with padding
+        for i in range(height):
+            for j in range(width):
+                pixel = pixels[i * width + j]
+                f.write(struct.pack('BBB', pixel.b, pixel.g, pixel.r))
+            f.write(b'\x00' * padding)  # Write padding bytes
+
+# Function to encrypt or decrypt the image
+def process_image(pixels, key, encrypt=True):
+    for pixel in pixels:
+        if encrypt:
+            pixel.r = (pixel.r + key) % 256
+            pixel.g = (pixel.g + key) % 256
+            pixel.b = (pixel.b + key) % 256
+        else:
+            pixel.r = (pixel.r - key + 256) % 256
+            pixel.g = (pixel.g - key + 256) % 256
+            pixel.b = (pixel.b - key + 256) % 256
+
+def main():
+    width, height, padding = 0, 0, 0
+    key = 123  # Encryption/Decryption key
+    choice = input("Simple Image Encryption Tool\nChoose operation (E)ncrypt or (D)ecrypt: ")
+
+    # Load the image
+    image, width, height, padding = read_image('input_image.bmp')
+
+    # Perform encryption or decryption
+    if choice in ['E', 'e']:
+        process_image(image, key, encrypt=True)
+        write_image('encrypted_image.bmp', image, width, height, padding)
+        print("Image encrypted and saved as 'encrypted_image.bmp'.")
+    elif choice in ['D', 'd']:
+        process_image(image, key, encrypt=False)
+        write_image('decrypted_image.bmp', image, width, height, padding)
+        print("Image decrypted and saved as 'decrypted_image.bmp'.")
+    else:
+        print("Invalid choice. Please choose 'E' or 'D'.")
+
+if __name__ == "__main__":
+    main()
